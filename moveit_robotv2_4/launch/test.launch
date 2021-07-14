@@ -1,0 +1,62 @@
+<launch>
+	<arg name="debug" default="false"/>
+
+	<!-- Controllers -->
+	<arg name="controllers" value="joint_state_controller arm_controller"/>
+	
+	<!-- Gazebo specific options -->
+	<arg name="gazebo_gui" default="true"/>
+	<arg name="paused" default="false"/>
+	
+	<!-- ************************** -->
+	<!-- Load robot and controllers -->
+	<!-- ************************** -->
+	<!-- Load the URDF, SRDF and other .yaml configuration files on the param server -->
+	<param name="robot_description" command="xacro '$(find robotv2_4)/urdf/robotv2_4.urdf'"/>
+	
+	<!-- Startup simulated world -->
+	<include file="$(find gazebo_ros)/launch/empty_world.launch">
+		<arg name="world_name" default="worlds/empty.world"/>
+		<arg name="paused" value="$(arg paused)"/>
+		<arg name="gui" value="$(arg gazebo_gui)"/>
+  	</include>
+
+  	<!-- Push robot_description to factory and spawn robot in gazebo -->
+  	<node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model" args="-urdf -param robot_description -model robotv2_4" respawn="false" output="screen"/>
+  	
+  	<!-- Push controllers to the parameters server -->
+  	<rosparam file="$(find moveit_robotv2_4)/config/ros_controllers.yaml" command="load"/>
+  	
+  	<!-- Spawn the controllers -->
+  	<node name="ros_control_controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" args=" $(arg controllers) --timeout 20"/>
+	
+	<!-- Robot state publisher -->
+  	<node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+		<param name="use_gui" value="$(arg gazebo_gui)"/>
+		<rosparam param="source_list">[/joint_states]</rosparam>
+	</node>
+  	  	
+  	<!-- ******************* -->
+  	<!-- Then, launch Moveit -->
+  	<!-- ******************* -->
+  	<!-- Run the main MoveIt executable -->
+  	<include file="$(find moveit_robotv2_4)/launch/move_group.launch">
+  		<arg name="publish_monitored_planning_scene" value="true"/>
+		<arg name="allow_trajectory_execution" value="true"/>
+		<arg name="fake_execution" value="false"/>
+		<arg name="pipeline" value="ompl"/>
+		<arg name="load_robot_description" value="true"/>
+		<arg name="info" value="true"/>
+		<arg name="debug" default="$(arg debug)"/>
+  	</include>
+  	
+  	<!-- ******** -->
+  	<!-- And Rviz -->
+  	<!-- ******** -->
+  	<!-- Run Rviz and load the default config to see the state of the move_group node -->
+  	<include file="$(find moveit_robotv2_4)/launch/moveit_rviz.launch">
+  		<arg name="rviz_config" default="$(find moveit_robotv2_4)/launch/moveit.rviz"/>
+		<arg name="debug" value="$(arg debug)"/>
+	</include>
+
+</launch>
